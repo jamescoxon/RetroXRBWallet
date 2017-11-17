@@ -14,14 +14,14 @@ from configparser import SafeConfigParser
 
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
-
+raw_in_xrb = 1000000000000000000000000000000.0
 choices = u'Balance Send Refresh Quit'.split()
 
 ws = create_connection("ws://46.101.42.44:8080")
 
 def xrb_account(address):
     # Given a string containing an XRB address, confirm validity and
-    #provide resulting hex address
+    # provide resulting hex address
     if len(address) == 64 and (address[:4] == 'xrb_'):
         # each index = binary value, account_lookup[0] == '1'
         account_map = "13456789abcdefghijkmnopqrstuwxyz"
@@ -41,7 +41,8 @@ def xrb_account(address):
         number_l = BitArray()
         for x in range(0, len(acrop_key)):
             number_l.append(account_lookup[acrop_key[x]])
-        # reduce from 260 to 256 bit (upper 4 bits are never used as account is a uint256)
+        # reduce from 260 to 256 bit (upper 4 bits are never used as account
+        # is a uint256)
         number_l = number_l[4:]
 
         check_l = BitArray()
@@ -63,7 +64,8 @@ def xrb_account(address):
         return False
 
 def account_xrb(account):
-    # Given a string containing a hex address, encode to public address format with checksum
+    # Given a string containing a hex address, encode to public address
+    # format with checksum
     # each index = binary value, account_lookup['00001'] == '3'
     account_map = "13456789abcdefghijkmnopqrstuwxyz"
     account_lookup = {}
@@ -103,7 +105,8 @@ def private_public(private):
     return ed25519.SigningKey(private).get_verifying_key().to_bytes()
 
 def seed_account(seed, index):
-    # Given an account seed and index #, provide the account private and public keys
+    # Given an account seed and index #, provide the account private and
+    # public keys
     h = blake2b(digest_size=32)
 
     seed_data = BitArray(hex=seed)
@@ -172,7 +175,7 @@ def get_balance(account):
     balance_result =  json.loads(str(ws.recv()))
     #print(balance_result['balance'])
 
-    balance = float(balance_result['balance']) / 1000000000000000000000000000000.0
+    balance = float(balance_result['balance']) / raw_in_xrb
     return balance
 
 def get_raw_balance(account):
@@ -280,8 +283,14 @@ def receive_xrb(_loop, _data):
 
             sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
             signature = str(binascii.hexlify(sig), 'ascii')
-
-            finished_block = '{ "type" : "receive", "source" : "%s", "previous" : "%s" , "work" : "%s", "signature" : "%s" }' % (source, previous, work, signature)
+            finished_block = f(
+                    '{ '
+                    '"type" : "receive", '
+                    '"source" : "{source}", '
+                    '"previous" : "{previous}", '
+                    '"work" : "{work}", '
+                    '"signature" : "{signature}" '
+                    '}')
 
             #print(finished_block)
 
@@ -322,8 +331,14 @@ def open_xrb():
 
     sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
     signature = str(binascii.hexlify(sig), 'ascii')
-
-    finished_block = '{ "type" : "open", "source" : "%s", "representative" : "%s" , "account" : "%s", "work" : "%s", "signature" : "%s" }' % (source, representative, account, work, signature)
+    finished_block = f(
+            '{ '
+            '"type" : "open", '
+            '"source" : "{source}", '
+            '"representative" : "{representative}", '
+            '"work" : "{work}", '
+            '"signature" : "{signature}" '
+            '}')
 
     #print(finished_block)
 
@@ -365,7 +380,8 @@ def item_chosen(button, choice):
        amount_edit = urwid.Edit(u"Amount in Mxrb?\n")
        send = urwid.Button(u'Send')
        done = urwid.Button(u'Back')
-       urwid.connect_signal(send, 'click', confirm_send, user_args=[xrb_edit, amount_edit])
+       urwid.connect_signal(send, 'click', confirm_send,
+               user_args=[xrb_edit, amount_edit])
        urwid.connect_signal(done, 'click', return_to_main)
        main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(xrb_edit, None, focus_map='reversed'),
@@ -398,10 +414,15 @@ def confirm_send(final_address, xrb_amount, button):
         new_balance = int_balance - int(raw_send)
         #print(new_balance)
 
-        response = urwid.Text([u'Sending...\n', u'Dest ', str(final_address.edit_text), u'\nAmount ', str(raw_send), u'\nNew Balance', str(new_balance), u'\nAre You Sure?'])
+        response = urwid.Text([u'Sending...\n',
+                u'Dest ', str(final_address.edit_text),
+                u'\nAmount ', str(raw_send),
+                u'\nNew Balance', str(new_balance),
+                u'\nAre You Sure?'])
         yes = urwid.Button(u'Yes')
         no = urwid.Button(u'No')
-        urwid.connect_signal(yes, 'click', process_send, user_args=[final_address, new_balance])
+        urwid.connect_signal(yes, 'click', process_send,
+                user_args=[final_address, new_balance])
         urwid.connect_signal(no, 'click', return_to_main)
         main.original_widget = urwid.Filler(urwid.Pile([response,
                 urwid.AttrMap(yes, None, focus_map='reversed'),
@@ -429,7 +450,8 @@ def process_send(final_address, final_balance, button):
 
 
 def return_to_main(button):
-    main.original_widget = urwid.Padding(menu(u'RaiBlocks Wallet', choices), left=2, right=2)
+    main.original_widget = urwid.Padding(menu(u'RaiBlocks Wallet', choices),
+            left=2, right=2)
 
 def exit_program(button):
     ws.close()
