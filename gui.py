@@ -224,15 +224,7 @@ def send_xrb(dest_address, final_balance):
     sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
     signature = str(binascii.hexlify(sig), 'ascii')
 
-    finished_block = f(
-            '{ '
-            '"type" : "send", '
-            '"destination" : "{dest_address}", '
-            '"balance" : "{hex_final_balance}", '
-            '"previous" : "{previous}", '
-            '"work" : "{work}", '
-            '"signature" : "{signature}" '
-            '}')
+    finished_block = '{ "type" : "send", "destination" : "%s", "balance" : "%s", "previous" : "%s" , "work" : "%s", "signature" : "%s" }' % (dest_address, hex_final_balance, previous, work, signature)
 
     #print(finished_block)
 
@@ -283,16 +275,9 @@ def receive_xrb(_loop, _data):
 
             sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
             signature = str(binascii.hexlify(sig), 'ascii')
-            finished_block = f(
-                    '{ '
-                    '"type" : "receive", '
-                    '"source" : "{source}", '
-                    '"previous" : "{previous}", '
-                    '"work" : "{work}", '
-                    '"signature" : "{signature}" '
-                    '}')
+            finished_block = '{ "type" : "receive", "source" : "%s", "previous" : "%s" , "work" : "%s", "signature" : "%s" }' % (source, previous, work, signature)
 
-            #print(finished_block)
+            print(finished_block)
 
             data = json.dumps({'action' : 'process', 'block' : finished_block})
             #print(data)
@@ -331,14 +316,7 @@ def open_xrb():
 
     sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
     signature = str(binascii.hexlify(sig), 'ascii')
-    finished_block = f(
-            '{ '
-            '"type" : "open", '
-            '"source" : "{source}", '
-            '"representative" : "{representative}", '
-            '"work" : "{work}", '
-            '"signature" : "{signature}" '
-            '}')
+    finished_block = '{ "type" : "open", "source" : "%s", "representative" : "%s" , "account" : "%s", "work" : "%s", "signature" : "%s" }' % (source, representative, account, work, signature)
 
     #print(finished_block)
 
