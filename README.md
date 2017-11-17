@@ -10,8 +10,16 @@ You will need:
 
 
 * Go into the python-pure25519-blake directory and install this `python3 setup.py install`
-* Run the wallet `python3 gui.py`, when it errors install the necessary libs (I'll add a list soon), for `websocket` the lib is actually `websocket-client`
+* Using pip3
+```
+urwid
+websocket
+websocket-client
+pyblake2 ( Microsoft Visual C++ 14.0 is required on Windows)
+```
+* Run the wallet `python3 gui.py`, when it errors install the necessary missing libs
 
 
 ## Tips
 * You can copy from the wallet by holding down your OSes modifier key, OS X its *fn*, and selecting the address
+* Currently you only have a single address
