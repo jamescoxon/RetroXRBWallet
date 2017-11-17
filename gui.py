@@ -15,7 +15,7 @@ from configparser import SafeConfigParser
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance Send Refresh Quit'.split()
+choices = u'Balance Send Configure Quit'.split()
 
 ws = create_connection("ws://46.101.42.44:8080")
 
@@ -406,6 +406,7 @@ def confirm_send(final_address, xrb_amount, button):
     #Calculate amount to send
     #send_amount is in Mxrb,
     send_amount = xrb_amount.edit_text
+    send_address = final_address.edit_text
     try:
         rai_send = float(send_amount) * 1000000 #float of total send
         raw_send = str(int(rai_send)) + '000000000000000000000000'
@@ -413,20 +414,28 @@ def confirm_send(final_address, xrb_amount, button):
         int_balance = int(get_raw_balance(account))
         new_balance = int_balance - int(raw_send)
         #print(new_balance)
-
-        response = urwid.Text([u'Sending...\n',
-                u'Dest ', str(final_address.edit_text),
-                u'\nAmount ', str(raw_send),
-                u'\nNew Balance', str(new_balance),
-                u'\nAre You Sure?'])
-        yes = urwid.Button(u'Yes')
-        no = urwid.Button(u'No')
-        urwid.connect_signal(yes, 'click', process_send,
-                user_args=[final_address, new_balance])
-        urwid.connect_signal(no, 'click', return_to_main)
-        main.original_widget = urwid.Filler(urwid.Pile([response,
-                urwid.AttrMap(yes, None, focus_map='reversed'),
-                urwid.AttrMap(no, None, focus_map='reversed')]))
+        
+        if len(send_address) != 64 or send_address[:4] != "xrb_":
+            response = urwid.Text([u'Error, incorrect address\n'])
+            back = urwid.Button(u'Back')
+            urwid.connect_signal(back, 'click', return_to_main)
+            main.original_widget = urwid.Filler(urwid.Pile([response,
+                urwid.AttrMap(back, None, focus_map='reversed')]))
+        
+        else:
+            response = urwid.Text([u'Sending...\n',
+                    u'Dest ', str(final_address.edit_text),
+                    u'\nAmount ', str(raw_send),
+                    u'\nNew Balance', str(new_balance),
+                    u'\nAre You Sure?'])
+            yes = urwid.Button(u'Yes')
+            no = urwid.Button(u'No')
+            urwid.connect_signal(yes, 'click', process_send,
+                    user_args=[final_address, new_balance])
+            urwid.connect_signal(no, 'click', return_to_main)
+            main.original_widget = urwid.Filler(urwid.Pile([response,
+                    urwid.AttrMap(yes, None, focus_map='reversed'),
+                    urwid.AttrMap(no, None, focus_map='reversed')]))
     except:
         response = urwid.Text([u'Error, incorrect amount\n'])
         back = urwid.Button(u'Back')

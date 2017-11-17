@@ -8,7 +8,7 @@ You will need:
 * Python3
 * Pip3 (to install the required libraries
 
-
+To install:
 * Go into the python-pure25519-blake directory and install this `python3 setup.py install`
 * Using pip3 install
 ```
@@ -16,6 +16,7 @@ urwid
 websocket
 websocket-client
 pyblake2 ( Microsoft Visual C++ 14.0 is required on Windows)
+bitstring
 ```
 * Run the wallet `python3 gui.py`, if it errors install the necessary missing libs
 
