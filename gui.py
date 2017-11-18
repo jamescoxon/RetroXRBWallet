@@ -5,17 +5,17 @@ import sys, os
 from websocket import create_connection
 
 import binascii
-import random
+import random, getpass
 from pyblake2 import blake2b
 from bitstring import BitArray
 from pure25519 import ed25519_oop as ed25519
-
+from simplecrypt import encrypt, decrypt
 from configparser import SafeConfigParser
 
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance Send Configure Quit'.split()
+choices = u'Balance Send Unlock Quit'.split()
 
 ws = create_connection("ws://46.101.42.44:8080")
 
@@ -444,16 +444,32 @@ def exit_program(button):
     ws.close()
     raise urwid.ExitMainLoop()
 
+def read_encrypted(password, filename, string=True):
+    with open(filename, 'rb') as input:
+        ciphertext = input.read()
+        plaintext = decrypt(password, ciphertext)
+        if string:
+            return plaintext.decode('utf8')
+        else:
+            return plaintext
+
+def write_encrypted(password, filename, plaintext):
+    with open(filename, 'wb') as output:
+        ciphertext = encrypt(password, plaintext)
+        output.write(ciphertext)
+
 parser = SafeConfigParser()
 config_files = parser.read('config.ini')
+password = getpass.getpass('Enter password')
 if len(config_files) == 0:
-    print("Make a new config file")
-    cfgfile = open("config.ini",'w')
+    print("Generate Wallet Seed")
     full_wallet_seed = hex(random.getrandbits(256))
     wallet_seed = full_wallet_seed[2:].upper()
-    print(wallet_seed)
+    print("Wallet Seed: " , wallet_seed)
+    cfgfile = open("config.ini",'w')
+    write_encrypted(password, 'seed.txt', wallet_seed)
+    
     parser.add_section('wallet')
-    parser.set('wallet', 'seed', str(wallet_seed))
     priv_key, pub_key = seed_account(wallet_seed, 0)
     public_key = str(binascii.hexlify(pub_key), 'ascii')
     print(str(public_key))
@@ -471,7 +487,7 @@ if len(config_files) == 0:
     seed = wallet_seed
 else:
     print("Config file found")
-    seed = parser.get('wallet', 'seed')
+    seed = read_encrypted(password, 'seed.txt', string=True)
     account = parser.get('wallet', 'account')
     index = int(parser.get('wallet', 'index'))
     representative = parser.get('wallet', 'representative')
