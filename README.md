@@ -1,6 +1,6 @@
 # RetroXRBWallet
 
-**Warning this is super beta test, your wallet seed is unencrypted in the config.ini file (though not passed to the server) so please just use this for testing**
+**Warning this is super beta test, your wallet seed is encoded with a password in seed.txt, it and your private keys are not passed to the server**
 
 ## Installation
 
@@ -17,6 +17,7 @@ websocket
 websocket-client
 pyblake2 ( Microsoft Visual C++ 14.0 is required on Windows)
 bitstring
+simple-crypt
 ```
 * Run the wallet `python3 gui.py`, if it errors install the necessary missing libs
 

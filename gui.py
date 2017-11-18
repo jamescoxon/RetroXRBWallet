@@ -15,7 +15,7 @@ from configparser import SafeConfigParser
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance Send Unlock Quit'.split()
+choices = u'Balance Send Configure Quit'.split()
 
 ws = create_connection("ws://46.101.42.44:8080")
 
@@ -120,10 +120,21 @@ def seed_account(seed, index):
 
 def get_pow(hash):
     #Generate work for block
-    data = json.dumps({'action' : 'work_generate', 'hash' : hash})
-    ws.send(data)
-    block_work = json.loads(str(ws.recv()))
-    work = block_work['work']
+    pow_source = parser.get('wallet', 'pow_source')
+    if pow_source == 'external':
+        data = json.dumps({'action' : 'work_generate', 'hash' : hash})
+        ws.send(data)
+        block_work = json.loads(str(ws.recv()))
+        work = block_work['work']
+    else:
+        response = urwid.Text([u'Running Internal PoW\nThis might take some time...'])
+        done = urwid.Button(u'Back')
+        urwid.connect_signal(done, 'click', return_to_main)
+        main.original_widget = urwid.Filler(urwid.Pile([response,
+            urwid.AttrMap(done, None, focus_map='reversed')]))
+        pow_work = pow_generate(hash)
+        work = str(pow_work, 'ascii')
+    
     return work
 
 def pow_threshold(check):
@@ -277,7 +288,7 @@ def receive_xrb(_loop, _data):
             signature = str(binascii.hexlify(sig), 'ascii')
             finished_block = '{ "type" : "receive", "source" : "%s", "previous" : "%s" , "work" : "%s", "signature" : "%s" }' % (source, previous, work, signature)
 
-            print(finished_block)
+            #print(finished_block)
 
             data = json.dumps({'action' : 'process', 'block' : finished_block})
             #print(data)
@@ -345,7 +356,6 @@ def menu(title, choices):
 def item_chosen(button, choice):
 
     if choice == 'Balance':
-
        response = urwid.Text([u'Balance: ', str(get_balance(account)), u'XRB\n'])
        done = urwid.Button(u'Ok')
        urwid.connect_signal(done, 'click', return_to_main)
@@ -367,6 +377,26 @@ def item_chosen(button, choice):
             urwid.AttrMap(send, None, focus_map='reversed'),
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
+    elif choice == 'Configure':
+        pow_source = parser.get('wallet', 'pow_source')
+        response = urwid.Text([u'Configure PoW Source', str(pow_source), '\n'])
+        if pow_source == 'external':
+            #response = urwid.Text([u'external\n'])
+            external_pow = urwid.CheckBox(u'External PoW', state=True)
+            internal_pow = urwid.CheckBox(u'Internal PoW', state=False)
+        else:
+            #response = urwid.Text([u'internal\n'])
+            external_pow = urwid.CheckBox(u'External PoW', state=False)
+            internal_pow = urwid.CheckBox(u'Internal PoW', state=True)
+        save = urwid.Button(u'Save')
+        done = urwid.Button(u'Back')
+        urwid.connect_signal(done, 'click', return_to_main)
+        urwid.connect_signal(save, 'click', change_pow, user_args=[internal_pow, external_pow])
+        main.original_widget = urwid.Filler(urwid.Pile([response,
+            urwid.AttrMap(internal_pow, None, focus_map='reversed'),
+            urwid.AttrMap(external_pow, None, focus_map='reversed'),
+            urwid.AttrMap(save, None, focus_map='reversed'),
+            urwid.AttrMap(done, None, focus_map='reversed')]))
 
     elif choice == 'Quit':
        response = urwid.Text([u'Are You Sure?\n'])
@@ -377,6 +407,27 @@ def item_chosen(button, choice):
        main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(yes, None, focus_map='reversed'),
             urwid.AttrMap(no, None, focus_map='reversed')]))
+
+def change_pow(internal_pow, external_pow, button):
+    #print(external_pow.get_state())
+    if external_pow.get_state() == True:
+        cfgfile = open("config.ini",'w')
+        parser.set('wallet', 'pow_source', 'external')
+        parser.write(cfgfile)
+        cfgfile.close()
+        pow_source = 'external'
+        #print('external')
+    else:
+        print('internal')
+        cfgfile = open("config.ini",'w')
+        parser.set('wallet', 'pow_source', 'internal')
+        parser.write(cfgfile)
+        cfgfile.close()
+        pow_source = 'internal'
+
+    #print(pow_source)
+    main.original_widget = urwid.Padding(menu(u'RaiBlocks Wallet', choices),
+                left=2, right=2)
 
 
 def confirm_send(final_address, xrb_amount, button):
@@ -434,8 +485,6 @@ def process_send(final_address, final_balance, button):
     main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
-
-
 def return_to_main(button):
     main.original_widget = urwid.Padding(menu(u'RaiBlocks Wallet', choices),
             left=2, right=2)
@@ -465,10 +514,10 @@ if len(config_files) == 0:
     print("Generate Wallet Seed")
     full_wallet_seed = hex(random.getrandbits(256))
     wallet_seed = full_wallet_seed[2:].upper()
-    print("Wallet Seed: " , wallet_seed)
-    cfgfile = open("config.ini",'w')
+    print("Wallet Seed (make a copy of this in a safe place!): " , wallet_seed)
     write_encrypted(password, 'seed.txt', wallet_seed)
     
+    cfgfile = open("config.ini",'w')
     parser.add_section('wallet')
     priv_key, pub_key = seed_account(wallet_seed, 0)
     public_key = str(binascii.hexlify(pub_key), 'ascii')
@@ -479,6 +528,7 @@ if len(config_files) == 0:
     parser.set('wallet', 'account', account)
     parser.set('wallet', 'index', '0')
     parser.set('wallet', 'representative', default_representative)
+    parser.set('wallet', 'pow_source', 'internal')
 
     parser.write(cfgfile)
     cfgfile.close()
@@ -487,12 +537,14 @@ if len(config_files) == 0:
     seed = wallet_seed
 else:
     print("Config file found")
+    print("Decoding wallet seed with your password")
     seed = read_encrypted(password, 'seed.txt', string=True)
     account = parser.get('wallet', 'account')
     index = int(parser.get('wallet', 'index'))
     representative = parser.get('wallet', 'representative')
+    pow_source = parser.get('wallet', 'pow_source')
 
-main = urwid.Padding(menu(u'RaiBlocks Wallet', choices), left=2, right=2)
+main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
 top = urwid.Overlay(main, urwid.SolidFill(u'\N{MEDIUM SHADE}'),
         align='center', width=('relative', 90),
         valign='middle', height=('relative', 60),
