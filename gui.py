@@ -372,6 +372,9 @@ def menu(title, choices):
     xrb_balance = 'Balance: ' + str(get_balance(account))  + ' Mxrb'
     balance_txt = urwid.Text(xrb_balance)
     body.append(urwid.AttrMap(balance_txt, None, focus_map='reversed'))
+    
+    paragraph_txt = urwid.Text('\n')
+    body.append(urwid.AttrMap(paragraph_txt, None, focus_map='reversed'))
 
     for c in choices:
         button = urwid.Button(c)
@@ -382,14 +385,14 @@ def menu(title, choices):
 def item_chosen(button, choice):
 
     if choice == 'Balance':
-       response = urwid.Text([u'Balance: ', str(get_balance(account)), u'XRB\n'])
+       response = urwid.Text([u'Balance: ', str(get_balance(account)), u'Mxrb\n'])
        done = urwid.Button(u'Ok')
        urwid.connect_signal(done, 'click', return_to_main)
        main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
     elif choice == 'Send':
-       response = urwid.Text([u'Balance: ', str(get_balance(account)), u'XRB\n'])
+       response = urwid.Text([u'Balance: ', str(get_balance(account)), u'Mxrb\n'])
        xrb_edit = urwid.Edit(u"Destination Address?\n")
        amount_edit = urwid.Edit(u"Amount in Mxrb?\n")
        send = urwid.Button(u'Send')
@@ -628,7 +631,7 @@ ws = create_connection(node_server)
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
 top = urwid.Overlay(main, urwid.SolidFill(u'\N{MEDIUM SHADE}'),
         align='center', width=('relative', 90),
-        valign='middle', height=('relative', 60),
+        valign='middle', height=('relative', 70),
         min_width=20, min_height=9)
 
 main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])
