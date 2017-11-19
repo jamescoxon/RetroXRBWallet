@@ -15,7 +15,7 @@ from configparser import SafeConfigParser
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance,Send,Configure PoW,Configure Rep,Quit'.split(',')
+choices = u'Balance,Send,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
 
 logging.basicConfig(filename="sample.log", level=logging.INFO)
 
@@ -237,8 +237,6 @@ def send_xrb(dest_address, final_balance):
 
     finished_block = '{ "type" : "send", "destination" : "%s", "balance" : "%s", "previous" : "%s" , "work" : "%s", "signature" : "%s" }' % (dest_address, hex_final_balance, previous, work, signature)
 
-    #print(finished_block)
-
     data = json.dumps({'action' : 'process', 'block' : finished_block})
     #print(data)
     ws.send(data)
@@ -289,8 +287,6 @@ def receive_xrb(_loop, _data):
             signature = str(binascii.hexlify(sig), 'ascii')
             finished_block = '{ "type" : "receive", "source" : "%s", "previous" : "%s" , "work" : "%s", "signature" : "%s" }' % (source, previous, work, signature)
 
-            #print(finished_block)
-
             data = json.dumps({'action' : 'process', 'block' : finished_block})
             #print(data)
             ws.send(data)
@@ -332,8 +328,6 @@ def open_xrb():
     signature = str(binascii.hexlify(sig), 'ascii')
     finished_block = '{ "type" : "open", "source" : "%s", "representative" : "%s" , "account" : "%s", "work" : "%s", "signature" : "%s" }' % (source, representative, account, work, signature)
 
-    #print(finished_block)
-
     data = json.dumps({'action' : 'process', 'block' : finished_block})
     #print(data)
     ws.send(data)
@@ -361,8 +355,6 @@ def change_xrb():
     sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
     signature = str(binascii.hexlify(sig), 'ascii')
     finished_block = '{ "type" : "change", "previous" : "%s", "representative" : "%s" , "work" : "%s", "signature" : "%s" }' % (previous, representative, work, signature)
-    
-    #print(finished_block)
     
     data = json.dumps({'action' : 'process', 'block' : finished_block})
     #print(data)
@@ -435,13 +427,26 @@ def item_chosen(button, choice):
     elif choice == 'Configure Rep':
         representative = parser.get('wallet', 'representative')
         response = urwid.Text([u'Configure Representative\n'])
-        xrb_rep = urwid.Edit(u"Representative?\n", edit_text=representative)
+        xrb_rep = urwid.Edit(u"Representative:\n", edit_text=representative)
         save = urwid.Button(u'Save')
         done = urwid.Button(u'Back')
         urwid.connect_signal(done, 'click', return_to_main)
         urwid.connect_signal(save, 'click', update_rep, user_args=[xrb_rep])
         main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(xrb_rep, None, focus_map='reversed'),
+            urwid.AttrMap(save, None, focus_map='reversed'),
+            urwid.AttrMap(done, None, focus_map='reversed')]))
+
+    elif choice == 'Configure Server':
+        node_server = parser.get('wallet', 'server')
+        response = urwid.Text([u'Configure Server\n'])
+        xrb_server = urwid.Edit(u"Server:\n", edit_text=node_server)
+        save = urwid.Button(u'Save and Restart')
+        done = urwid.Button(u'Back')
+        urwid.connect_signal(done, 'click', return_to_main)
+        urwid.connect_signal(save, 'click', update_server, user_args=[xrb_server])
+        main.original_widget = urwid.Filler(urwid.Pile([response,
+            urwid.AttrMap(xrb_server, None, focus_map='reversed'),
             urwid.AttrMap(save, None, focus_map='reversed'),
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
@@ -468,6 +473,15 @@ def update_rep(xrb_rep, button):
         change_xrb()
         main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
                                              left=2, right=2)
+
+def update_server(xrb_server, button):
+    new_server = xrb_server.edit_text
+    cfgfile = open("config.ini",'w')
+    parser.set('wallet', 'server', new_server)
+    parser.write(cfgfile)
+    cfgfile.close()
+    ws.close()
+    raise urwid.ExitMainLoop()
 
 
 def change_pow(internal_pow, external_pow, button):
@@ -516,8 +530,8 @@ def confirm_send(final_address, xrb_amount, button):
         else:
             response = urwid.Text([u'Sending...\n',
                     u'Dest ', str(final_address.edit_text),
-                    u'\nAmount ', str(raw_send),
-                    u'\nNew Balance', str(new_balance),
+                    u'\nAmount      ', str(raw_send),
+                    u'\nNew Balance ', str(new_balance),
                     u'\nAre You Sure?'])
             yes = urwid.Button(u'Yes')
             no = urwid.Button(u'No')
@@ -591,6 +605,8 @@ if len(config_files) == 0:
     parser.set('wallet', 'index', '0')
     parser.set('wallet', 'representative', default_representative)
     parser.set('wallet', 'pow_source', 'internal')
+    parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
+    
 
     parser.write(cfgfile)
     cfgfile.close()
@@ -605,8 +621,9 @@ else:
     index = int(parser.get('wallet', 'index'))
     representative = parser.get('wallet', 'representative')
     pow_source = parser.get('wallet', 'pow_source')
+    node_server = parser.get('wallet', 'server')
 
-ws = create_connection("ws://46.101.42.44:8080")
+ws = create_connection(node_server)
 
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
 top = urwid.Overlay(main, urwid.SolidFill(u'\N{MEDIUM SHADE}'),
