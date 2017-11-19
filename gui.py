@@ -135,7 +135,7 @@ def get_pow(hash):
             urwid.AttrMap(done, None, focus_map='reversed')]))
         pow_work = pow_generate(hash)
         work = str(pow_work, 'ascii')
-    
+
     return work
 
 def pow_threshold(check):
@@ -340,27 +340,27 @@ def open_xrb():
 def change_xrb():
     representative = parser.get('wallet', 'representative')
     previous = get_previous()
-    
+
     priv_key, pub_key = seed_account(seed,index)
     public_key = ed25519.SigningKey(priv_key).get_verifying_key().to_ascii(encoding="hex")
-    
+
     #print("Starting PoW Generation")
     work = get_pow(previous)
     #print("Completed PoW Generation")
-    
+
     #Calculate signature
     bh = blake2b(digest_size=32)
     bh.update(BitArray(hex=previous).bytes)
     bh.update(BitArray(hex=xrb_account(representative)).bytes)
-    
+
     sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
     signature = str(binascii.hexlify(sig), 'ascii')
     finished_block = '{ "type" : "change", "previous" : "%s", "representative" : "%s" , "work" : "%s", "signature" : "%s" }' % (previous, representative, work, signature)
-    
+
     data = json.dumps({'action' : 'process', 'block' : finished_block})
     #print(data)
     ws.send(data)
-    
+
     block_reply = ws.recv()
     logging.info(block_reply)
 #print(block_reply)
@@ -373,7 +373,7 @@ def menu(title, choices):
     xrb_balance = 'Balance: ' + str(get_balance(account))  + ' Mxrb'
     balance_txt = urwid.Text(xrb_balance)
     body.append(urwid.AttrMap(balance_txt, None, focus_map='reversed'))
-    
+
     paragraph_txt = urwid.Text('\n')
     body.append(urwid.AttrMap(paragraph_txt, None, focus_map='reversed'))
 
@@ -542,14 +542,14 @@ def confirm_send(final_address, xrb_amount, button):
         int_balance = int(get_raw_balance(account))
         new_balance = int_balance - int(raw_send)
         #print(new_balance)
-        
+
         if len(send_address) != 64 or send_address[:4] != "xrb_":
             response = urwid.Text([u'Error, incorrect address\n'])
             back = urwid.Button(u'Back')
             urwid.connect_signal(back, 'click', return_to_main)
             main.original_widget = urwid.Filler(urwid.Pile([response,
                 urwid.AttrMap(back, None, focus_map='reversed')]))
-        
+
         else:
             response = urwid.Text([u'Sending...\n',
                     u'Dest ', str(final_address.edit_text),
@@ -608,28 +608,35 @@ def write_encrypted(password, filename, plaintext):
 
 parser = SafeConfigParser()
 config_files = parser.read('config.ini')
-password = getpass.getpass('Enter password')
+
+while True:
+    password = getpass.getpass('Enter password: ')
+    password_confirm = getpass.getpass('Confirm password: ')
+    if password == password_confirm:
+        break
+    print("Password Mismatch!")
+
 if len(config_files) == 0:
-    print("Generate Wallet Seed")
+    print("Generating Wallet Seed")
     full_wallet_seed = hex(random.getrandbits(256))
     wallet_seed = full_wallet_seed[2:].upper()
-    print("Wallet Seed (make a copy of this in a safe place!): " , wallet_seed)
+    print("Wallet Seed (make a copy of this in a safe place!): ", wallet_seed)
     write_encrypted(password, 'seed.txt', wallet_seed)
-    
+
     cfgfile = open("config.ini",'w')
     parser.add_section('wallet')
     priv_key, pub_key = seed_account(wallet_seed, 0)
     public_key = str(binascii.hexlify(pub_key), 'ascii')
-    print(str(public_key))
+    print("Public Key: ", str(public_key))
 
     account = account_xrb(str(public_key))
-    print(account)
+    print("Account Address: ", account)
+
     parser.set('wallet', 'account', account)
     parser.set('wallet', 'index', '0')
     parser.set('wallet', 'representative', default_representative)
     parser.set('wallet', 'pow_source', 'internal')
     parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
-    
 
     parser.write(cfgfile)
     cfgfile.close()
@@ -640,12 +647,12 @@ else:
     print("Config file found")
     print("Decoding wallet seed with your password")
     seed = read_encrypted(password, 'seed.txt', string=True)
-    account = parser.get('wallet', 'account')
-    index = int(parser.get('wallet', 'index'))
-    representative = parser.get('wallet', 'representative')
-    pow_source = parser.get('wallet', 'pow_source')
-    node_server = parser.get('wallet', 'server')
 
+account = parser.get('wallet', 'account')
+index = int(parser.get('wallet', 'index'))
+representative = parser.get('wallet', 'representative')
+pow_source = parser.get('wallet', 'pow_source')
+node_server = parser.get('wallet', 'server')
 ws = create_connection(node_server)
 
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
