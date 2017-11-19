@@ -11,11 +11,12 @@ from bitstring import BitArray
 from pure25519 import ed25519_oop as ed25519
 from simplecrypt import encrypt, decrypt
 from configparser import SafeConfigParser
+import pyqrcode
 
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance,Send,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
+choices = u'Balance,Send,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
 
 logging.basicConfig(filename="sample.log", level=logging.INFO)
 
@@ -453,6 +454,25 @@ def item_chosen(button, choice):
             urwid.AttrMap(save, None, focus_map='reversed'),
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
+    elif choice == 'Display QR Code':
+        data = 'xrb:' + account
+        xrb_qr = pyqrcode.create(data, error='L', version=4, mode=None, encoding='iso-8859-1')
+        list = []
+        for blocks in xrb_qr.text():
+            if blocks == '1':
+                list.append(u"\u2588")
+                list.append(u"\u2588")
+            elif blocks == '0':
+                list.append(chr(32))
+                list.append(chr(32))
+            else:
+                list.append('\n')
+        response = urwid.Text(list)
+        done = urwid.Button(u'Back')
+        urwid.connect_signal(done, 'click', return_to_main)
+        main.original_widget = urwid.Filler(urwid.Pile([response,
+            urwid.AttrMap(done, None)]))
+
     elif choice == 'Quit':
        response = urwid.Text([u'Are You Sure?\n'])
        yes = urwid.Button(u'Yes')
@@ -631,7 +651,7 @@ ws = create_connection(node_server)
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
 top = urwid.Overlay(main, urwid.SolidFill(u'\N{MEDIUM SHADE}'),
         align='center', width=('relative', 90),
-        valign='middle', height=('relative', 70),
+        valign='middle', height=('relative', 80),
         min_width=20, min_height=9)
 
 main_loop = urwid.MainLoop(top, palette=[('reversed', 'standout', '')])

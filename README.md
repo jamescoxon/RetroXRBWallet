@@ -13,12 +13,12 @@ To install:
 * Using pip3 install
 ```
 urwid
-websocket
 websocket-client
 pyblake2 ( Microsoft Visual C++ 14.0 is required on Windows)
 bitstring
 simple-crypt
 configparser
+pyqrcode
 ```
 * Run the wallet `python3 gui.py`, if it errors install the necessary missing libs
 
@@ -27,4 +27,6 @@ configparser
 * You can copy from the wallet by holding down your OSes modifier key, OS X its *fn*, and selecting the address
 * Currently you only have a single address
 * Your setting are in config.ini
+* Your wallet seed is kept encoded with a password in the seed.txt file
 * The lite wallet does all the signing itself so doesnt pass you wallet seed or private keys to the server/network
+* To view the QR code you will need to enlarge your terminal window
