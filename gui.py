@@ -1,7 +1,7 @@
 import urwid
 import websocket
 import json
-import sys, os
+import sys, os, logging
 from websocket import create_connection
 
 import binascii
@@ -15,9 +15,9 @@ from configparser import SafeConfigParser
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance Send Configure Quit'.split()
+choices = u'Balance,Send,Configure PoW,Configure Rep,Quit'.split(',')
 
-ws = create_connection("ws://46.101.42.44:8080")
+logging.basicConfig(filename="sample.log", level=logging.INFO)
 
 def xrb_account(address):
     # Given a string containing an XRB address, confirm validity and
@@ -244,6 +244,7 @@ def send_xrb(dest_address, final_balance):
     ws.send(data)
 
     block_reply = ws.recv()
+    logging.info(block_reply)
     #print(block_reply)
     return block_reply
 
@@ -295,10 +296,12 @@ def receive_xrb(_loop, _data):
             ws.send(data)
 
             block_reply = ws.recv()
+            logging.info(block_reply)
             #print(block_reply)
     main_loop.set_alarm_in(60, receive_xrb)
 
 def open_xrb():
+    representative = parser.get('wallet', 'representative')
     #Get pending blocks
     data = json.dumps({'action' : 'pending', 'account' : account})
 
@@ -336,7 +339,38 @@ def open_xrb():
     ws.send(data)
 
     block_reply = ws.recv()
+    logging.info(block_reply)
     #print(block_reply)
+
+def change_xrb():
+    representative = parser.get('wallet', 'representative')
+    previous = get_previous()
+    
+    priv_key, pub_key = seed_account(seed,index)
+    public_key = ed25519.SigningKey(priv_key).get_verifying_key().to_ascii(encoding="hex")
+    
+    #print("Starting PoW Generation")
+    work = get_pow(previous)
+    #print("Completed PoW Generation")
+    
+    #Calculate signature
+    bh = blake2b(digest_size=32)
+    bh.update(BitArray(hex=previous).bytes)
+    bh.update(BitArray(hex=xrb_account(representative)).bytes)
+    
+    sig = ed25519.SigningKey(priv_key+pub_key).sign(bh.digest())
+    signature = str(binascii.hexlify(sig), 'ascii')
+    finished_block = '{ "type" : "change", "previous" : "%s", "representative" : "%s" , "work" : "%s", "signature" : "%s" }' % (previous, representative, work, signature)
+    
+    #print(finished_block)
+    
+    data = json.dumps({'action' : 'process', 'block' : finished_block})
+    #print(data)
+    ws.send(data)
+    
+    block_reply = ws.recv()
+    logging.info(block_reply)
+#print(block_reply)
 
 def menu(title, choices):
     body = [urwid.Text(title), urwid.Divider()]
@@ -377,9 +411,9 @@ def item_chosen(button, choice):
             urwid.AttrMap(send, None, focus_map='reversed'),
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
-    elif choice == 'Configure':
+    elif choice == 'Configure PoW':
         pow_source = parser.get('wallet', 'pow_source')
-        response = urwid.Text([u'Configure PoW Source', str(pow_source), '\n'])
+        response = urwid.Text([u'Configure PoW Source\n'])
         if pow_source == 'external':
             #response = urwid.Text([u'external\n'])
             external_pow = urwid.CheckBox(u'External PoW', state=True)
@@ -398,6 +432,19 @@ def item_chosen(button, choice):
             urwid.AttrMap(save, None, focus_map='reversed'),
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
+    elif choice == 'Configure Rep':
+        representative = parser.get('wallet', 'representative')
+        response = urwid.Text([u'Configure Representative\n'])
+        xrb_rep = urwid.Edit(u"Representative?\n", edit_text=representative)
+        save = urwid.Button(u'Save')
+        done = urwid.Button(u'Back')
+        urwid.connect_signal(done, 'click', return_to_main)
+        urwid.connect_signal(save, 'click', update_rep, user_args=[xrb_rep])
+        main.original_widget = urwid.Filler(urwid.Pile([response,
+            urwid.AttrMap(xrb_rep, None, focus_map='reversed'),
+            urwid.AttrMap(save, None, focus_map='reversed'),
+            urwid.AttrMap(done, None, focus_map='reversed')]))
+
     elif choice == 'Quit':
        response = urwid.Text([u'Are You Sure?\n'])
        yes = urwid.Button(u'Yes')
@@ -407,6 +454,21 @@ def item_chosen(button, choice):
        main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(yes, None, focus_map='reversed'),
             urwid.AttrMap(no, None, focus_map='reversed')]))
+
+def update_rep(xrb_rep, button):
+    new_rep = xrb_rep.edit_text
+    if len(new_rep) != 64 or new_rep[:4] != "xrb_":
+        print('Error')
+    else:
+        cfgfile = open("config.ini",'w')
+        parser.set('wallet', 'representative', new_rep)
+        parser.write(cfgfile)
+        cfgfile.close()
+        #Send change block
+        change_xrb()
+        main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
+                                             left=2, right=2)
+
 
 def change_pow(internal_pow, external_pow, button):
     #print(external_pow.get_state())
@@ -426,7 +488,7 @@ def change_pow(internal_pow, external_pow, button):
         pow_source = 'internal'
 
     #print(pow_source)
-    main.original_widget = urwid.Padding(menu(u'RaiBlocks Wallet', choices),
+    main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
                 left=2, right=2)
 
 
@@ -486,7 +548,7 @@ def process_send(final_address, final_balance, button):
             urwid.AttrMap(done, None, focus_map='reversed')]))
 
 def return_to_main(button):
-    main.original_widget = urwid.Padding(menu(u'RaiBlocks Wallet', choices),
+    main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
             left=2, right=2)
 
 def exit_program(button):
@@ -543,6 +605,8 @@ else:
     index = int(parser.get('wallet', 'index'))
     representative = parser.get('wallet', 'representative')
     pow_source = parser.get('wallet', 'pow_source')
+
+ws = create_connection("ws://46.101.42.44:8080")
 
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
 top = urwid.Overlay(main, urwid.SolidFill(u'\N{MEDIUM SHADE}'),

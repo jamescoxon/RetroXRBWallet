@@ -18,6 +18,7 @@ websocket-client
 pyblake2 ( Microsoft Visual C++ 14.0 is required on Windows)
 bitstring
 simple-crypt
+configparser
 ```
 * Run the wallet `python3 gui.py`, if it errors install the necessary missing libs
 
