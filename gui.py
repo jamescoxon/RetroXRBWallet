@@ -212,6 +212,19 @@ def get_previous():
 
     return previous
 
+def get_pending():
+    #Get pending blocks
+    data = json.dumps({'action' : 'pending', 'account' : account})
+    
+    ws.send(data)
+    
+    pending_blocks =  ws.recv()
+    #print("Received '%s'" % pending_blocks)
+    
+    rx_data = json.loads(str(pending_blocks))
+
+    return rx_data['blocks']
+
 def send_xrb(dest_address, final_balance):
     previous = get_previous()
 
@@ -248,18 +261,9 @@ def send_xrb(dest_address, final_balance):
     return block_reply
 
 def receive_xrb(_loop, _data):
-    #Get pending blocks
-    data = json.dumps({'action' : 'pending', 'account' : account})
+    pending = get_pending()
 
-    ws.send(data)
-
-    pending_blocks =  ws.recv()
-    #print("Received '%s'" % pending_blocks)
-
-    rx_data = json.loads(str(pending_blocks))
-    #for blocks in rx_data['blocks']:
-    #print(rx_data['blocks'][0])
-    if len(rx_data['blocks']) > 0:
+    if len(pending) > 0:
 
         data = json.dumps({'action' : 'account_info', 'account' : account})
         ws.send(data)
@@ -268,7 +272,7 @@ def receive_xrb(_loop, _data):
             #print('Not found')
             open_xrb()
         else:
-            source = rx_data['blocks'][0]
+            source = pending[0]
 
             #Get account info
             previous = get_previous()
@@ -618,7 +622,7 @@ while True:
 
 if len(config_files) == 0:
     print("Generating Wallet Seed")
-    full_wallet_seed = hex(random.getrandbits(256))
+    full_wallet_seed = hex(random.SystemRandom().getrandbits(256))
     wallet_seed = full_wallet_seed[2:].upper()
     print("Wallet Seed (make a copy of this in a safe place!): ", wallet_seed)
     write_encrypted(password, 'seed.txt', wallet_seed)
