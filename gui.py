@@ -16,7 +16,7 @@ import pyqrcode
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance,Send,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
+choices = u'Balance,Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
 
 logging.basicConfig(filename="sample.log", level=logging.INFO)
 
@@ -476,6 +476,26 @@ def item_chosen(button, choice):
         urwid.connect_signal(done, 'click', return_to_main)
         main.original_widget = urwid.Filler(urwid.Pile([response,
             urwid.AttrMap(done, None)]))
+
+    elif choice == 'Account History':
+        data = json.dumps({'action' : 'account_history', 'account' : account, 'count': 10})
+        ws.send(data)
+        history_blocks =  ws.recv()
+        rx_data = json.loads(str(history_blocks))
+
+        body = []
+        
+        for blocks in rx_data['history']:
+            #print(blocks['amount'])
+            ind_history = blocks['type'] + '  ' + blocks['account'] + ' ' + str(float(blocks['amount']) / raw_in_xrb) + '\n'
+            address_txt = urwid.Text(ind_history)
+            body.append(urwid.AttrMap(address_txt, None, focus_map='reversed'))
+
+        done = urwid.Button(u'Back')
+        urwid.connect_signal(done, 'click', return_to_main)
+        body.append(urwid.AttrMap(done, None, focus_map='reversed'))
+        main.original_widget = urwid.Filler(urwid.Pile(body))
+
 
     elif choice == 'Quit':
        response = urwid.Text([u'Are You Sure?\n'])
