@@ -120,23 +120,32 @@ def seed_account(seed, index):
     return account_key.bytes, private_public(account_key.bytes)
 
 def get_pow(hash):
-    #Generate work for block
-    pow_source = parser.get('wallet', 'pow_source')
-    if pow_source == 'external':
-        data = json.dumps({'action' : 'work_generate', 'hash' : hash})
-        ws.send(data)
-        block_work = json.loads(str(ws.recv()))
-        work = block_work['work']
-    else:
-        response = urwid.Text([u'Running Internal PoW\nThis might take some time...'])
-        done = urwid.Button(u'Back')
-        urwid.connect_signal(done, 'click', return_to_main)
-        main.original_widget = urwid.Filler(urwid.Pile([response,
-            urwid.AttrMap(done, None, focus_map='reversed')]))
-        pow_work = pow_generate(hash)
-        work = str(pow_work, 'ascii')
+    cached_work = parser.get('wallet', 'cached_pow')
+    if cached_work == '':
+        #Generate work for block
+        pow_source = parser.get('wallet', 'pow_source')
+        if pow_source == 'external':
+            data = json.dumps({'action' : 'work_generate', 'hash' : hash})
+            ws.send(data)
+            block_work = json.loads(str(ws.recv()))
+            work = block_work['work']
+        else:
+            response = urwid.Text([u'Running Internal PoW\nThis might take some time...'])
+            done = urwid.Button(u'Back')
+            urwid.connect_signal(done, 'click', return_to_main)
+            main.original_widget = urwid.Filler(urwid.Pile([response,
+                urwid.AttrMap(done, None, focus_map='reversed')]))
+            pow_work = pow_generate(hash)
+            work = str(pow_work, 'ascii')
 
-    return work
+        return work
+            
+    else:
+        cfgfile = open("config.ini",'w')
+        parser.set('wallet', 'cached_pow', '')
+        parser.write(cfgfile)
+        cfgfile.close()
+        return cached_work
 
 def pow_threshold(check):
     if check > b'\xFF\xFF\xFF\xC0\x00\x00\x00\x00': return True
@@ -299,6 +308,20 @@ def receive_xrb(_loop, _data):
             block_reply = ws.recv()
             logging.info(block_reply)
             #print(block_reply)
+    else:
+    #Lets cache a PoW for later
+        if parser.get('wallet', 'cached_pow') == '':
+            previous = get_previous()
+            work = get_pow(previous)
+            cfgfile = open("config.ini",'w')
+            parser.set('wallet', 'cached_pow', work)
+            parser.write(cfgfile)
+            cfgfile.close()
+            logging.info("Cached PoW Block")
+        else:
+            logging.info("Cached PoW Block Not Needed")
+
+
     main_loop.set_alarm_in(60, receive_xrb)
 
 def open_xrb():
@@ -661,6 +684,7 @@ if len(config_files) == 0:
     parser.set('wallet', 'representative', default_representative)
     parser.set('wallet', 'pow_source', 'internal')
     parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
+    parser.set('wallet', 'cached_pow', '')
 
     parser.write(cfgfile)
     cfgfile.close()
@@ -677,6 +701,7 @@ index = int(parser.get('wallet', 'index'))
 representative = parser.get('wallet', 'representative')
 pow_source = parser.get('wallet', 'pow_source')
 node_server = parser.get('wallet', 'server')
+cached_work = parser.get('wallet', 'cached_pow')
 ws = create_connection(node_server)
 
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
