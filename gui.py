@@ -16,7 +16,7 @@ import pyqrcode
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Balance,Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
+choices = u'Refresh,Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
 
 logging.basicConfig(filename="sample.log", level=logging.INFO)
 
@@ -119,9 +119,10 @@ def seed_account(seed, index):
     account_key = BitArray(h.digest())
     return account_key.bytes, private_public(account_key.bytes)
 
-def get_pow(hash):
+def get_pow(hash, type):
+
     cached_work = parser.get('wallet', 'cached_pow')
-    if cached_work == '':
+    if cached_work == '' or type == 'open':
         #Generate work for block
         pow_source = parser.get('wallet', 'pow_source')
         if pow_source == 'external':
@@ -244,7 +245,7 @@ def send_xrb(dest_address, final_balance):
     #print(final_balance)
 
     #print("Starting PoW Generation")
-    work = get_pow(previous)
+    work = get_pow(previous, 'send')
     #workbytes = pow_generate(previous)
     #work = str(workbytes, 'ascii')
     #print("Completed PoW Generation")
@@ -289,7 +290,7 @@ def receive_xrb(_loop, _data):
             priv_key, pub_key = seed_account(seed,index)
 
             #print("Starting PoW Generation")
-            work = get_pow(previous)
+            work = get_pow(previous, 'receive')
             #print("Completed PoW Generation")
 
             #Calculate signature
@@ -312,14 +313,12 @@ def receive_xrb(_loop, _data):
     #Lets cache a PoW for later
         if parser.get('wallet', 'cached_pow') == '':
             previous = get_previous()
-            work = get_pow(previous)
+            work = get_pow(previous, 'cache')
             cfgfile = open("config.ini",'w')
             parser.set('wallet', 'cached_pow', work)
             parser.write(cfgfile)
             cfgfile.close()
             logging.info("Cached PoW Block")
-        else:
-            logging.info("Cached PoW Block Not Needed")
 
 
     main_loop.set_alarm_in(60, receive_xrb)
@@ -343,7 +342,7 @@ def open_xrb():
     public_key = ed25519.SigningKey(priv_key).get_verifying_key().to_ascii(encoding="hex")
 
     #print("Starting PoW Generation")
-    work = get_pow(str(public_key, 'ascii'))
+    work = get_pow(str(public_key, 'ascii'), 'open')
     #print("Completed PoW Generation")
 
     #Calculate signature
@@ -372,7 +371,7 @@ def change_xrb():
     public_key = ed25519.SigningKey(priv_key).get_verifying_key().to_ascii(encoding="hex")
 
     #print("Starting PoW Generation")
-    work = get_pow(previous)
+    work = get_pow(previous, 'change')
     #print("Completed PoW Generation")
 
     #Calculate signature
@@ -412,12 +411,9 @@ def menu(title, choices):
 
 def item_chosen(button, choice):
 
-    if choice == 'Balance':
-       response = urwid.Text([u'Balance: ', str(get_balance(account)), u'Mxrb\n'])
-       done = urwid.Button(u'Ok')
-       urwid.connect_signal(done, 'click', return_to_main)
-       main.original_widget = urwid.Filler(urwid.Pile([response,
-            urwid.AttrMap(done, None, focus_map='reversed')]))
+    if choice == 'Refresh':
+        main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
+                                             left=2, right=2)
 
     elif choice == 'Send':
        response = urwid.Text([u'Balance: ', str(get_balance(account)), u'Mxrb\n'])
@@ -501,23 +497,32 @@ def item_chosen(button, choice):
             urwid.AttrMap(done, None)]))
 
     elif choice == 'Account History':
-        data = json.dumps({'action' : 'account_history', 'account' : account, 'count': 10})
+        data = json.dumps({ "action": "account_block_count", "account": account })
+        ws.send(data)
+        block_count =  ws.recv()
+        rx_data = json.loads(str(block_count))
+        account_block_count = rx_data['block_count']
+        data = json.dumps({'action' : 'account_history', 'account' : account, 'count': int(account_block_count)})
         ws.send(data)
         history_blocks =  ws.recv()
         rx_data = json.loads(str(history_blocks))
 
-        body = []
+        history_title = 'Account History (' + account_block_count + ')'
+        body = [urwid.Text(history_title), urwid.Divider()]
+        rx_data['history'].reverse()
         
         for blocks in rx_data['history']:
             #print(blocks['amount'])
-            ind_history = blocks['type'] + '  ' + blocks['account'] + ' ' + str(float(blocks['amount']) / raw_in_xrb) + '\n'
+            #str(float(blocks['amount']) / raw_in_xrb)
+            ind_history = blocks['type'] + ' ' + blocks['amount'] + ' ' + blocks['account'] + '\n'
             address_txt = urwid.Text(ind_history)
             body.append(urwid.AttrMap(address_txt, None, focus_map='reversed'))
 
         done = urwid.Button(u'Back')
         urwid.connect_signal(done, 'click', return_to_main)
         body.append(urwid.AttrMap(done, None, focus_map='reversed'))
-        main.original_widget = urwid.Filler(urwid.Pile(body))
+        #main.original_widget = urwid.Filler(urwid.Pile(body))
+        main.original_widget = urwid.ListBox(urwid.SimpleListWalker(body))
 
 
     elif choice == 'Quit':
