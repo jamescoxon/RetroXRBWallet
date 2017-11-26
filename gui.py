@@ -16,7 +16,7 @@ import pyqrcode
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Refresh,Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
+choices = u'Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
 
 logging.basicConfig(filename="sample.log", level=logging.INFO)
 
@@ -316,7 +316,7 @@ def receive_xrb(_loop, _data):
             #print(block_reply)
     else:
     #Lets cache a PoW for later
-        if parser.get('wallet', 'cached_pow') == '':
+        if parser.get('wallet', 'cached_pow') == '' and parser.get('wallet', 'open') == '1':
             previous = get_previous()
             work = get_pow(previous, 'cache')
             save_config('cached_pow', work)
@@ -363,6 +363,8 @@ def open_xrb():
 
     block_reply = ws.recv()
     logging.info(block_reply)
+
+    save_config('open', '1')
     #print(block_reply)
 
 def change_xrb():
@@ -505,29 +507,33 @@ def item_chosen(button, choice):
         ws.send(data)
         block_count =  ws.recv()
         rx_data = json.loads(str(block_count))
-        account_block_count = rx_data['block_count']
-        data = json.dumps({'action' : 'account_history', 'account' : account, 'count': int(account_block_count)})
-        ws.send(data)
-        history_blocks =  ws.recv()
-        rx_data = json.loads(str(history_blocks))
-
-        history_title = 'Account History (' + account_block_count + ')'
-        body = [urwid.Text(history_title), urwid.Divider()]
-        rx_data['history'].reverse()
-        
-        count = 0
-        for blocks in rx_data['history']:
-            count = count + 1
-            #print(blocks['amount'])
-            #str(float(blocks['amount']) / raw_in_xrb)
-            ind_history = str(count) + ') ' + blocks['type'] + ' ' + str(float(blocks['amount']) / raw_in_xrb) + 'Mxrb ' + blocks['account'] + '\n'
-            address_txt = urwid.Text(ind_history)
-            body.append(urwid.AttrMap(address_txt, None, focus_map='reversed'))
+        if 'error' in rx_data:
+            account_block_count = '0'
+            history_title = 'Account History (' + account_block_count + ')'
+            body = [urwid.Text(history_title), urwid.Divider()]
+        else:
+            account_block_count = rx_data['block_count']
+            data = json.dumps({'action' : 'account_history', 'account' : account, 'count': int(account_block_count)})
+            ws.send(data)
+            history_blocks =  ws.recv()
+            rx_data = json.loads(str(history_blocks))
+            
+            history_title = 'Account History (' + account_block_count + ')'
+            body = [urwid.Text(history_title), urwid.Divider()]
+            rx_data['history'].reverse()
+            
+            count = 0
+            for blocks in rx_data['history']:
+                count = count + 1
+                #print(blocks['amount'])
+                #str(float(blocks['amount']) / raw_in_xrb)
+                ind_history = str(count) + ') ' + blocks['type'] + ' ' + str(float(blocks['amount']) / raw_in_xrb) + 'Mxrb ' + blocks['account'] + '\n'
+                address_txt = urwid.Text(ind_history)
+                body.append(urwid.AttrMap(address_txt, None, focus_map='reversed'))
 
         done = urwid.Button(u'Back')
         urwid.connect_signal(done, 'click', return_to_main)
         body.append(urwid.AttrMap(done, None, focus_map='reversed'))
-        #main.original_widget = urwid.Filler(urwid.Pile(body))
         main.original_widget = urwid.ListBox(urwid.SimpleListWalker(body))
 
 
@@ -672,7 +678,7 @@ if len(config_files) == 0:
 
     cfgfile = open("config.ini",'w')
     parser.add_section('wallet')
-    priv_key, pub_key = seed_account(wallet_seed, 0)
+    priv_key, pub_key = seed_account(str(wallet_seed), 0)
     public_key = str(binascii.hexlify(pub_key), 'ascii')
     print("Public Key: ", str(public_key))
 
@@ -686,6 +692,7 @@ if len(config_files) == 0:
     parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
     parser.set('wallet', 'cached_pow', '')
     parser.set('wallet', 'balance', '0')
+    parser.set('wallet', 'open', '0')
 
     parser.write(cfgfile)
     cfgfile.close()
@@ -704,6 +711,7 @@ pow_source = parser.get('wallet', 'pow_source')
 node_server = parser.get('wallet', 'server')
 cached_work = parser.get('wallet', 'cached_pow')
 saved_balance =float(parser.get('wallet', 'balance'))
+account_open = parser.get('wallet', 'open')
 
 ws = create_connection(node_server)
 
