@@ -16,7 +16,7 @@ import pyqrcode
 default_representative = \
         'xrb_16k5pimotz9zehjk795wa4qcx54mtusk8hc5mdsjgy57gnhbj3hj6zaib4ic'
 raw_in_xrb = 1000000000000000000000000000000.0
-choices = u'Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Quit'.split(',')
+choices = u'Send,Account History,Display QR Code,,Configure PoW,Configure Rep,Configure Server,,Refresh,Quit'.split(',')
 
 logging.basicConfig(filename="sample.log", level=logging.INFO)
 
