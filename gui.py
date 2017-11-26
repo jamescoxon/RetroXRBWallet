@@ -142,10 +142,7 @@ def get_pow(hash, type):
         return work
             
     else:
-        cfgfile = open("config.ini",'w')
-        parser.set('wallet', 'cached_pow', '')
-        parser.write(cfgfile)
-        cfgfile.close()
+        save_config('cached_pow', '')
         return cached_work
 
 def pow_threshold(check):
@@ -235,6 +232,13 @@ def get_pending():
 
     return rx_data['blocks']
 
+def save_config(variable, value):
+    cfgfile = open("config.ini",'w')
+    parser.set('wallet', variable, value)
+    parser.write(cfgfile)
+    cfgfile.close()
+
+
 def send_xrb(dest_address, final_balance):
     previous = get_previous()
 
@@ -308,16 +312,14 @@ def receive_xrb(_loop, _data):
 
             block_reply = ws.recv()
             logging.info(block_reply)
+            save_config('balance', str(get_balance(account)))
             #print(block_reply)
     else:
     #Lets cache a PoW for later
         if parser.get('wallet', 'cached_pow') == '':
             previous = get_previous()
             work = get_pow(previous, 'cache')
-            cfgfile = open("config.ini",'w')
-            parser.set('wallet', 'cached_pow', work)
-            parser.write(cfgfile)
-            cfgfile.close()
+            save_config('cached_pow', work)
             logging.info("Cached PoW Block")
 
 
@@ -396,7 +398,8 @@ def menu(title, choices):
     address_txt = urwid.Text(account)
     body.append(urwid.AttrMap(address_txt, None, focus_map='reversed'))
 
-    xrb_balance = 'Balance: ' + str(get_balance(account))  + ' Mxrb'
+
+    xrb_balance = 'Balance: ' + parser.get('wallet', 'balance')  + ' Mxrb'
     balance_txt = urwid.Text(xrb_balance)
     body.append(urwid.AttrMap(balance_txt, None, focus_map='reversed'))
 
@@ -412,11 +415,12 @@ def menu(title, choices):
 def item_chosen(button, choice):
 
     if choice == 'Refresh':
+        save_config('balance', str(get_balance(account)))
         main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
                                              left=2, right=2)
 
     elif choice == 'Send':
-       response = urwid.Text([u'Balance: ', str(get_balance(account)), u'Mxrb\n'])
+       response = urwid.Text([u'Balance: ', parser.get('wallet', 'balance'), u'Mxrb\n'])
        xrb_edit = urwid.Edit(u"Destination Address?\n")
        amount_edit = urwid.Edit(u"Amount in Mxrb?\n")
        send = urwid.Button(u'Send')
@@ -511,10 +515,12 @@ def item_chosen(button, choice):
         body = [urwid.Text(history_title), urwid.Divider()]
         rx_data['history'].reverse()
         
+        count = 0
         for blocks in rx_data['history']:
+            count = count + 1
             #print(blocks['amount'])
             #str(float(blocks['amount']) / raw_in_xrb)
-            ind_history = blocks['type'] + ' ' + blocks['amount'] + ' ' + blocks['account'] + '\n'
+            ind_history = str(count) + ') ' + blocks['type'] + ' ' + str(float(blocks['amount']) / raw_in_xrb) + 'Mxrb ' + blocks['account'] + '\n'
             address_txt = urwid.Text(ind_history)
             body.append(urwid.AttrMap(address_txt, None, focus_map='reversed'))
 
@@ -540,10 +546,7 @@ def update_rep(xrb_rep, button):
     if len(new_rep) != 64 or new_rep[:4] != "xrb_":
         print('Error')
     else:
-        cfgfile = open("config.ini",'w')
-        parser.set('wallet', 'representative', new_rep)
-        parser.write(cfgfile)
-        cfgfile.close()
+        save_config('representative', new_rep)
         #Send change block
         change_xrb()
         main.original_widget = urwid.Padding(menu(u'RetroXRBWallet', choices),
@@ -551,10 +554,7 @@ def update_rep(xrb_rep, button):
 
 def update_server(xrb_server, button):
     new_server = xrb_server.edit_text
-    cfgfile = open("config.ini",'w')
-    parser.set('wallet', 'server', new_server)
-    parser.write(cfgfile)
-    cfgfile.close()
+    save_config('server', new_server)
     ws.close()
     raise urwid.ExitMainLoop()
 
@@ -562,18 +562,12 @@ def update_server(xrb_server, button):
 def change_pow(internal_pow, external_pow, button):
     #print(external_pow.get_state())
     if external_pow.get_state() == True:
-        cfgfile = open("config.ini",'w')
-        parser.set('wallet', 'pow_source', 'external')
-        parser.write(cfgfile)
-        cfgfile.close()
+        save_config('pow_source', 'external')
         pow_source = 'external'
         #print('external')
     else:
         print('internal')
-        cfgfile = open("config.ini",'w')
-        parser.set('wallet', 'pow_source', 'internal')
-        parser.write(cfgfile)
-        cfgfile.close()
+        save_config('pow_source', 'internal')
         pow_source = 'internal'
 
     #print(pow_source)
@@ -627,7 +621,8 @@ def confirm_send(final_address, xrb_amount, button):
 def process_send(final_address, final_balance, button):
     outcome = send_xrb(str(final_address.edit_text), final_balance)
     if len(outcome) == 4:
-       response = urwid.Text([u'Success'])
+        response = urwid.Text([u'Success'])
+        save_config('balance', str(get_balance(account)))
     else:
        response = urwid.Text([u'Failed'])
 
@@ -690,6 +685,7 @@ if len(config_files) == 0:
     parser.set('wallet', 'pow_source', 'internal')
     parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
     parser.set('wallet', 'cached_pow', '')
+    parser.set('wallet', 'balance', '0')
 
     parser.write(cfgfile)
     cfgfile.close()
@@ -707,6 +703,8 @@ representative = parser.get('wallet', 'representative')
 pow_source = parser.get('wallet', 'pow_source')
 node_server = parser.get('wallet', 'server')
 cached_work = parser.get('wallet', 'cached_pow')
+saved_balance =float(parser.get('wallet', 'balance'))
+
 ws = create_connection(node_server)
 
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
