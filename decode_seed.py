@@ -24,5 +24,6 @@ while True:
         break
     print("Password Mismatch!")
 
+print('Decoding Now')
 seed = read_encrypted(password, 'seed.txt', string=True)
 print(seed)

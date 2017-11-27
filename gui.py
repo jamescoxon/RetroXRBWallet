@@ -706,7 +706,11 @@ if len(config_files) == 0:
 else:
     print("Config file found")
     print("Decoding wallet seed with your password")
-    seed = read_encrypted(password, 'seed.txt', string=True)
+    try:
+        seed = read_encrypted(password, 'seed.txt', string=True)
+    except:
+        print('\nError decoding seed, check password and try again')
+        sys.exit()
 
 account = parser.get('wallet', 'account')
 index = int(parser.get('wallet', 'index'))
@@ -717,7 +721,11 @@ cached_work = parser.get('wallet', 'cached_pow')
 saved_balance =float(parser.get('wallet', 'balance'))
 account_open = parser.get('wallet', 'open')
 
-ws = create_connection(node_server)
+try:
+    ws = create_connection(node_server)
+except:
+    print('\nError - unable to connect to backend server\nTry again later or change the server in config.ini')
+    sys.exit()
 
 main = urwid.Padding(menu(u'RetroXRBWallet', choices), left=2, right=2)
 top = urwid.Overlay(main, urwid.SolidFill(u'\N{MEDIUM SHADE}'),
