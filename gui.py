@@ -522,6 +522,10 @@ def item_chosen(button, choice):
             body = [urwid.Text(history_title), urwid.Divider()]
             rx_data['history'].reverse()
             
+            first_done = urwid.Button(u'Back')
+            urwid.connect_signal(first_done, 'click', return_to_main)
+            body.append(urwid.AttrMap(first_done, None, focus_map='reversed'))
+            
             count = 0
             for blocks in rx_data['history']:
                 count = count + 1
