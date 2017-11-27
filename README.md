@@ -30,3 +30,4 @@ pyqrcode
 * Your wallet seed is kept encoded with a password in the seed.txt file
 * The lite wallet does all the signing itself so doesnt pass you wallet seed or private keys to the server/network
 * To view the QR code you will need to enlarge your terminal window
+* You can import another wallet seed using the `import_seed.py` script and decode your current wallet seed with your password using `decode_seed.py`
