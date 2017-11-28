@@ -1,3 +1,8 @@
+#TODO
+#Previous - could reduce server involvement by storing previous hash, requesting server on boot + updating with each transaction
+#Convert PoW to cpython or even a c binary that could be dropped in to increase speed (would also benefit from multicore support)
+#Increase timeout on server
+
 import urwid
 import websocket
 import json
@@ -148,19 +153,6 @@ def get_pow(hash, type):
 def pow_threshold(check):
     if check > b'\xFF\xFF\xFF\xC0\x00\x00\x00\x00': return True
     else: return False
-
-def pow_validate(pow, hash):
-    pow_data = bytearray.fromhex(pow)
-    hash_data = bytearray.fromhex(hash)
-
-    h = blake2b(digest_size=8)
-    pow_data.reverse()
-    h.update(pow_data)
-    h.update(hash_data)
-    final = bytearray(h.digest())
-    final.reverse()
-
-    return pow_threshold(final)
 
 def pow_generate(hash):
     hash_bytes = bytearray.fromhex(hash)
@@ -693,7 +685,7 @@ if len(config_files) == 0:
     parser.set('wallet', 'index', '0')
     parser.set('wallet', 'representative', default_representative)
     parser.set('wallet', 'pow_source', 'internal')
-    parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
+    parser.set('wallet', 'server', 'wss://46.101.42.44:8080')
     parser.set('wallet', 'cached_pow', '')
     parser.set('wallet', 'balance', '0')
     parser.set('wallet', 'open', '0')
