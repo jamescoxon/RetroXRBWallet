@@ -155,7 +155,7 @@ if len(config_files) == 0:
     parser.set('wallet', 'index', '0')
     parser.set('wallet', 'representative', default_representative)
     parser.set('wallet', 'pow_source', 'internal')
-    parser.set('wallet', 'server', 'ws://46.101.42.44:8080')
+    parser.set('wallet', 'server', 'wss://yapraiwallet.space')
     parser.set('wallet', 'cached_pow', '')
     parser.set('wallet', 'balance', '0')
     parser.set('wallet', 'open', '0')
